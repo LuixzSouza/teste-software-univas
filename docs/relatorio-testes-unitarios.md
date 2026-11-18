@@ -1,6 +1,6 @@
 # Relatório — Testes unitários com IA generativa
 
-**Aluno(s):**
+**Aluno(s):** Luiz Antônio de Souza
 **Ferramenta de IA utilizada:** Claude Code
 **Unidades testadas:** `backend/src/utils/taskRules.ts` — RN01 (`canTransition`) e `backend/src/utils/normalize.ts` — RN03 (`normalizeName`)
 
