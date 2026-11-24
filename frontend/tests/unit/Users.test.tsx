@@ -117,8 +117,8 @@ describe('Users — abrir formulário (RF04)', () => {
     expect(screen.getByRole('button', { name: 'Criar' })).toBeInTheDocument()
   })
 
-  // DEFEITO RF07: rótulo não associado ao campo (ver relatório, seção 5)
-  it.fails('exibe o campo Nome ao clicar em "Adicionar Usuário"', async () => {
+  // RF07 corrigido no upstream (commit 3a57228): it.fails removido (ver relatório, seção 5)
+  it('exibe o campo Nome ao clicar em "Adicionar Usuário"', async () => {
     const user = await renderizarCarregado([])
 
     await abrirFormulario(user)
@@ -126,8 +126,8 @@ describe('Users — abrir formulário (RF04)', () => {
     expect(screen.getByLabelText(/Nome/i)).toBeInTheDocument()
   })
 
-  // DEFEITO RF07: rótulo não associado ao campo (ver relatório, seção 5)
-  it.fails('exibe o campo Email ao clicar em "Adicionar Usuário"', async () => {
+  // RF07 corrigido no upstream (commit 3a57228): it.fails removido (ver relatório, seção 5)
+  it('exibe o campo Email ao clicar em "Adicionar Usuário"', async () => {
     const user = await renderizarCarregado([])
 
     await abrirFormulario(user)
@@ -146,8 +146,8 @@ describe('Users — cancelar formulário (RF05)', () => {
     expect(screen.queryByRole('button', { name: 'Criar' })).not.toBeInTheDocument()
   })
 
-  // DEFEITO RF07: rótulo não associado ao campo (ver relatório, seção 5)
-  it.fails('limpa os campos digitados ao clicar em "Cancelar"', async () => {
+  // RF07 corrigido no upstream (commit 3a57228): it.fails removido (ver relatório, seção 5)
+  it('limpa os campos digitados ao clicar em "Cancelar"', async () => {
     // Arrange: abre o formulário e digita nos campos
     const user = await renderizarCarregado([])
     await abrirFormulario(user)
@@ -174,8 +174,8 @@ describe('Users — editar usuário (RF06)', () => {
     expect(screen.queryByRole('button', { name: 'Criar' })).not.toBeInTheDocument()
   })
 
-  // DEFEITO RF07: rótulo não associado ao campo (ver relatório, seção 5)
-  it.fails('abre o formulário com o nome do usuário preenchido', async () => {
+  // RF07 corrigido no upstream (commit 3a57228): it.fails removido (ver relatório, seção 5)
+  it('abre o formulário com o nome do usuário preenchido', async () => {
     const user = await renderizarCarregado([ana])
 
     await user.click(screen.getByRole('button', { name: 'Editar' }))
@@ -183,8 +183,8 @@ describe('Users — editar usuário (RF06)', () => {
     expect(screen.getByLabelText(/Nome/i)).toHaveValue('Ana')
   })
 
-  // DEFEITO RF07: rótulo não associado ao campo (ver relatório, seção 5)
-  it.fails('abre o formulário com o email do usuário preenchido', async () => {
+  // RF07 corrigido no upstream (commit 3a57228): it.fails removido (ver relatório, seção 5)
+  it('abre o formulário com o email do usuário preenchido', async () => {
     const user = await renderizarCarregado([ana])
 
     await user.click(screen.getByRole('button', { name: 'Editar' }))
@@ -192,8 +192,8 @@ describe('Users — editar usuário (RF06)', () => {
     expect(screen.getByLabelText(/Email/i)).toHaveValue('ana@email.com')
   })
 
-  // DEFEITO RF07: rótulo não associado ao campo (ver relatório, seção 5)
-  it.fails('preenche o formulário com os dados da linha clicada, não de outra', async () => {
+  // RF07 corrigido no upstream (commit 3a57228): it.fails removido (ver relatório, seção 5)
+  it('preenche o formulário com os dados da linha clicada, não de outra', async () => {
     // Arrange: dois usuários; o clique é na segunda linha
     const user = await renderizarCarregado([
       ana,
@@ -210,9 +210,9 @@ describe('Users — editar usuário (RF06)', () => {
 })
 
 describe('Users — acessibilidade do formulário (RF07)', () => {
-  // DEFEITO RF07: os <label> não estão associados aos <input> (sem htmlFor/id
-  // nem input dentro do label). Ver relatório, seção 5.
-  it.fails.each(['Nome', 'Email'])('associa o campo %s ao seu rótulo', async (rotulo) => {
+  // RF07 corrigido no upstream (commit 3a57228): rótulos associados via htmlFor/id.
+  // Ver relatório, seção 5.
+  it.each(['Nome', 'Email'])('associa o campo %s ao seu rótulo', async (rotulo) => {
     const user = await renderizarCarregado([])
     await abrirFormulario(user)
 

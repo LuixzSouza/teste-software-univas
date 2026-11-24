@@ -266,3 +266,97 @@ Esse comportamento só passará a ser verificado depois que o defeito de RF07 fo
 A correção é uma alteração de produção (associar `htmlFor`/`id` ou colocar o `<input>` dentro do `<label>`). Ela deve ser
 feita em commit separado e decidida pelo aluno, não durante a escrita dos testes. Depois da correção, os 8 testes passarão e
 o `it.fails` deverá ser removido.
+
+**Atualização (Aula 12):** o defeito RF07 foi corrigido no repositório da disciplina (commit `3a57228`, rótulos com
+`htmlFor`/`id`). Após sincronizar o fork, os 8 testes passaram e o `it.fails` foi removido, sem alterar nenhuma asserção.
+
+---
+
+# Parte 3 — Testes de integração (Aula 12)
+
+**Backend:** API03, API04 e API05 com Supertest + PostgreSQL (`teste_software_test_db`).
+Arquivos: `backend/tests/integration/categories.int.test.ts` e `backend/tests/integration/tasks.int.test.ts`.
+**Frontend:** RF08 e RF09 com Testing Library + MSW. Arquivo: `frontend/tests/integration/Users.create.int.test.tsx`.
+
+## 1. Tabela de casos (antes de usar a IA)
+
+### Backend
+
+| #  | Regra | Estado inicial | Requisição | Resposta esperada | Efeito no banco |
+|----|-------|----------------|------------|-------------------|-----------------|
+| 1  | API03 | categoria sem tarefas | `DELETE /api/categories/:id` | 200 `{ success: true }` | categoria removida |
+| 2  | API03 | categoria com 1 tarefa (limite) | `DELETE /api/categories/:id` | 400 `{ success: false, error }` | categoria e tarefa mantidas |
+| 3  | API03 | categoria com 2 tarefas | `DELETE /api/categories/:id` | 400 | categoria e as 2 tarefas mantidas |
+| 4  | API03 | outra categoria existente | `DELETE /api/categories/inexistente` | 404 | nenhum (1 categoria continua) |
+| 5  | API04 | banco vazio | `POST /api/categories` `{ name: "Trabalho" }` | 201 com `data.id` | 1 categoria gravada |
+| 6  | API04 | existe `trabalho` | `POST` `{ name: "Trabalhos" }` | 201 | 2 categorias |
+| 7  | API04 | existe `" trabalho "` | `POST` `{ name: "Trabalho" }` | 409 | nenhuma criada |
+| 8  | API04 | existe `trabalho` | `POST` `{ name: "  TRABALHO  " }` | 409 | nenhuma criada |
+| 9  | API04 | existe `trabalho da faculdade` | `POST` `{ name: "  Trabalho   da\tFaculdade " }` | 409 | nenhuma criada |
+| 10–13 | API05 | tarefa PENDING→IN_PROGRESS, PENDING→CANCELLED, IN_PROGRESS→COMPLETED, IN_PROGRESS→CANCELLED | `PUT /api/tasks/:id` `{ status }` | 200, `data.status` novo | novo status gravado |
+| 14–19 | API05 | tarefa COMPLETED→PENDING, COMPLETED→IN_PROGRESS, CANCELLED→PENDING, CANCELLED→IN_PROGRESS, PENDING→COMPLETED, IN_PROGRESS→PENDING | `PUT /api/tasks/:id` `{ status }` | 400 `{ success: false, error }` | status e `updatedAt` inalterados |
+| 20 | API05 | outra tarefa existente | `PUT /api/tasks/inexistente` | 404 | outra tarefa inalterada |
+
+### Frontend (o "estado inicial" é a resposta do handler MSW)
+
+| #  | Req. | Handlers MSW | Ação do usuário | Resultado esperado |
+|----|------|--------------|-----------------|--------------------|
+| 21 | RF08 | GET → [Ana]; POST → 201 | preencher Nome/Email, clicar "Criar" | corpo do POST = `{ name, email }` digitados |
+| 22 | RF08 | GET → lista atualizada após o POST | idem | formulário fechado; GET chamado 2 vezes; linha do novo usuário com email e 0 tarefas |
+| 23 | RF09 | POST → 409 `{ success: false, error }` | idem, com email repetido | mensagem "Email já cadastrado" |
+| 24 | RF09 | POST → 409 | idem | formulário aberto com os dados digitados |
+
+## 2. Prompts utilizados
+
+```
+Contexto: rotas DELETE /api/categories/:id, POST /api/categories e PUT /api/tasks/:id,
+contratos API03, API04 e API05 e regras RN01–RN04 de docs/especificacao.md.
+Tarefa: escreva testes de integração em backend/tests/integration/categories.int.test.ts
+e tasks.int.test.ts.
+Casos obrigatórios (definidos por mim): tabela Backend, casos 1 a 20.
+Restrições: siga o AGENTS.md (seção Testes de integração). Use request(app) e os helpers
+de helpers/db.ts. Não use vi.mock. Não altere src/.
+Saída: execute npm run test:integration e relacione cada teste a uma linha da tabela.
+```
+
+```
+Contexto: componente Users, requisitos RF08 e RF09, contratos API01 e API02.
+Tarefa: escreva testes de integração em frontend/tests/integration/Users.create.int.test.tsx.
+Casos obrigatórios: tabela Frontend, casos 21 a 24.
+Restrições: siga o AGENTS.md. Use MSW (server.use), sem vi.spyOn(api). Respostas no
+formato do contrato. No POST, verifique o corpo recebido com await request.json().
+Não altere src/. Saída: execute npm run test:integration e relacione cada teste à tabela.
+```
+
+## 3. Revisão do teste gerado
+
+| Problema encontrado | Ajuste |
+|---------------------|--------|
+| No frontend, os componentes de um teste continuavam montados no seguinte (`Found multiple elements ... "Adicionar Usuário"`). | `afterEach(() => cleanup())` no arquivo, mesmo problema da Aula 11. |
+| Checklist de sinais de alerta (slide 18): sem `vi.mock` do Prisma, sem `vi.spyOn(api)`, status + corpo + efeito no banco, cenário criado no próprio teste, `testDatabase.ts` intocado, handlers no formato do contrato, corpo do POST verificado. | Conferido. |
+| Os testes de integração antigos da Aula 10 (`*.test.ts` com `tests/helpers.ts`) não seguem o padrão `*.int.test.ts` da nova configuração. | Mantidos no repositório, mas não são executados por `npm run test:integration`. |
+
+## 4. Resultados
+
+- **Frontend** (`npm test`): 27 testes, 26 aprovados + 1 falha esperada (`it.fails`, defeito RF09).
+- **Backend** (`npm run test:integration`): testes escritos (casos 1–20), **execução pendente**. O `globalSetup` do
+  projeto executa `prisma db push --force-reset` no banco `teste_software_test_db`, e o Prisma bloqueia esse comando
+  quando ele é disparado por um agente de IA sem o consentimento explícito do aluno. Para executar:
+  `docker compose up -d postgres` e, em `backend/`, `npm run test:integration`.
+
+### Sabotagem controlada (slide 19)
+
+| # | Sabotagem | Arquivo | Regra | Detectada? | Testes que falharam |
+|---|-----------|---------|-------|------------|---------------------|
+| 1 | Remover a checagem `canDeleteCategory` | `categoryController.ts` | API03 | pendente (backend) | — |
+| 2 | Trocar o status 409 por 400 | `userController.ts` | API01 | pendente (backend) | — |
+| 3 | Remover `include: { tasks: ... }` de `getUsers` | `userController.ts` | API02 | pendente (backend) | — |
+| 4 | Remover `fetchUsers()` após salvar | `Users.tsx` | RF08 | **Sim** | RF08 › envia ao POST o nome e o email digitados; RF08 › após o 201, fecha o formulário e a lista recarregada exibe o novo usuário |
+
+Cada sabotagem é desfeita com `git restore src/` antes da próxima.
+
+## 5. Defeitos encontrados
+
+| Regra | Comportamento especificado | Comportamento observado | Teste que evidencia |
+|-------|----------------------------|-------------------------|---------------------|
+| RF09 | Com `409` ao criar usuário, exibir "Email já cadastrado" | O componente exibe a mensagem genérica "Erro ao salvar usuário" (o `catch` de `handleSubmit` ignora o status e o `error` da resposta) | `Users.create.int.test.tsx` › RF09 › exibe a mensagem "Email já cadastrado" (`it.fails`) |
