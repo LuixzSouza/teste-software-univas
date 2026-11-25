@@ -419,10 +419,23 @@ Para J03, J05, J06, J07 e J08 o prompt foi o mesmo, trocando a jornada, a tela, 
 ## 4. Resultados (etapa 5 — avaliar)
 
 - `npm run test:e2e`: **14 aprovados**. Isso inclui 4 falhas esperadas (`test.fail()`): J05 cadastrar, J05 editar, J07 e J08.
-- **Estabilidade** (`npx playwright test --repeat-each=5`): 69 de 70 execuções aprovadas. Uma execução do J02 (teste de
-  referência) falhou na repetição 2. Ao repetir o J02 isoladamente 10 vezes (`--repeat-each=10`), passou em todas.
-  Os artefatos dessa falha não foram preservados, então a causa não foi confirmada. É um caso de **teste intermitente
-  a investigar**: a suspeita é concorrência com o banco compartilhado da aplicação.
+- **Estabilidade** (`npx playwright test --repeat-each=5`): cada um dos 14 testes executado 5 vezes seguidas (70 execuções
+  por rodada).
+
+  | Rodada | Data | Execuções | Aprovadas | Falhas inesperadas | Observação |
+  |--------|------|-----------|-----------|--------------------|------------|
+  | 1 | 25/11/2026 | 70 | 69 | 1 | J02 (teste de referência) falhou na repetição 2 |
+  | — | 25/11/2026 | 10 | 10 | 0 | J02 isolado com `--repeat-each=10` |
+  | 2 | 25/11/2026 | 70 | 70 | 0 | — |
+  | 3 | 25/11/2026 | 70 | 70 | 0 | — |
+
+  Além disso, a suíte foi executada uma vez sem repetição (`npm run test:e2e`): 14 aprovados.
+
+  Nas rodadas 2 e 3, as 4 falhas esperadas (`test.fail()`) falharam em todas as repetições, e todos os demais testes
+  passaram em todas. Os defeitos, portanto, são reproduzíveis, não intermitentes. A única falha inesperada (J02, rodada 1)
+  não se repetiu em 90 execuções posteriores do J02. Os artefatos dela não foram preservados, então a causa não foi
+  confirmada: fica registrada como **possível intermitência a investigar**. A suspeita é concorrência com o banco
+  compartilhado da aplicação, já que os testes E2E usam o mesmo banco em execução.
 
 ### Sabotagem controlada
 
