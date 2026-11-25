@@ -360,3 +360,88 @@ Cada sabotagem é desfeita com `git restore src/` antes da próxima.
 | Regra | Comportamento especificado | Comportamento observado | Teste que evidencia |
 |-------|----------------------------|-------------------------|---------------------|
 | RF09 | Com `409` ao criar usuário, exibir "Email já cadastrado" | O componente exibe a mensagem genérica "Erro ao salvar usuário" (o `catch` de `handleSubmit` ignora o status e o `error` da resposta) | `Users.create.int.test.tsx` › RF09 › exibe a mensagem "Email já cadastrado" (`it.fails`) |
+
+---
+
+# Parte 4 — Testes E2E com Playwright (Aula 13)
+
+**Jornadas:** J03, J04, J05 e J06 (obrigatórias); J07 e J08 (complementares). J01 e J02 são os testes de referência.
+**Ambiente:** aplicação completa no Docker (`docker compose up -d`): frontend :3000, backend :3001 e PostgreSQL.
+O Playwright (Chromium) roda na máquina local.
+**Arquivos:** `frontend/tests/e2e/UsersEdit.e2e.spec.ts` (J03), `UsersDelete.e2e.spec.ts` (J04),
+`Categories.e2e.spec.ts` (J05, J06), `UsersEmail.e2e.spec.ts` (J07), `Tasks.e2e.spec.ts` (J08).
+
+## 1. Tabela de casos (antes de usar a IA)
+
+| #  | Jornada | Preparação (API, fixture `dados`) | Passos do usuário | Resultado visível | Após recarregar |
+|----|---------|-----------------------------------|-------------------|-------------------|-----------------|
+| 1  | J03 | usuário com email e nome únicos | "Editar" na linha → campo Nome preenchido → novo nome → "Atualizar" | formulário fecha; linha exibe o novo nome; nome antigo não aparece | novo nome aparece; antigo não |
+| 2  | J04 | usuário com email único | "Excluir" na linha → **confirmar** | linha removida | usuário não aparece |
+| 3  | J04 | usuário com email único | "Excluir" na linha → **cancelar** (alternativa) | linha permanece | usuário aparece |
+| 4  | J05 | nenhuma (nome único) | "Adicionar Categoria" → Nome e Descrição → "Criar" | formulário fecha; categoria e descrição na lista | categoria aparece |
+| 5  | J05 | categoria com nome único | "Editar" → novo nome → "Atualizar" | novo nome na lista; antigo não | novo nome aparece; antigo não |
+| 6  | J05 | categoria com nome único | "Excluir" → confirmar | linha removida | categoria não aparece |
+| 7  | J05 | categoria com nome único | "Excluir" → cancelar (alternativa) | linha permanece | categoria aparece |
+| 8  | J06 | usuário + categoria + 1 tarefa nela | "Excluir" na categoria → confirmar | mensagem de erro; categoria permanece | categoria aparece |
+| 9  | J07 | usuário com email único | "Adicionar Usuário" → outro nome, **mesmo email** → "Criar" | "Email já cadastrado" | — |
+| 10 | J08 | tarefa com status COMPLETED | "Editar" → Status = Pendente → "Atualizar" | lista continua com COMPLETED | lista exibe COMPLETED |
+
+## 2. Prompt utilizado (etapas 2 e 3 — contextualizar e gerar)
+
+O mesmo modelo do slide 16, um por jornada. Exemplo do J04:
+
+```
+Contexto: jornada J04 de docs/especificacao.md, tela /users. A aplicação está em
+execução (docker compose).
+Tarefa: escreva o teste E2E em frontend/tests/e2e/UsersDelete.e2e.spec.ts.
+Casos obrigatórios (definidos por mim):
+| # | Preparação        | Passos               | Após recarregar |
+| 1 | usuário via dados | Excluir e confirmar  | não aparece     |
+| 2 | usuário via dados | Excluir e cancelar   | aparece         |
+Restrições: siga o AGENTS.md (seção Testes E2E). Use a fixture dados,
+getByRole/getByLabel e page.once('dialog'). Sem waitForTimeout. Não altere src/
+nem a configuração.
+Saída: execute npm run test:e2e e relacione cada teste a uma linha da tabela.
+```
+
+Para J03, J05, J06, J07 e J08 o prompt foi o mesmo, trocando a jornada, a tela, o arquivo e as linhas da tabela da seção 1.
+
+## 3. Revisão do teste gerado (etapa 4 — sinais de alerta)
+
+| Problema encontrado | Ajuste |
+|---------------------|--------|
+| J05 (cadastrar/editar) e J08 falharam com `getByLabel('Nome:')` / `getByLabel('Status:')`: *element(s) not found*. Nas telas de Categorias e Tarefas, os `<label>` não estão associados aos campos. | **J05:** a jornada cita os "campos Nome e Descrição", que o usuário identifica pelo rótulo. O localizador foi mantido, o defeito foi registrado e os testes foram marcados com `test.fail()`. **J08:** a jornada trata da RN01, não de rótulos. Foi corrigido **apenas o localizador** (limite do healer): `getByRole('combobox').filter({ has: getByRole('option', { name: 'Concluída' }) })`, sem CSS e sem `nth()`. |
+| J08 verificava uma "mensagem de erro" que a jornada **não exige**. | Asserção removida por ir além da especificação. As asserções da jornada (COMPLETED antes e depois de recarregar) foram mantidas. |
+| No J05 (cadastrar), com `test.fail()`, o `fill` esperava 30 s e terminava em *timeout*, que o Playwright não aceita como falha esperada. | Adicionado `await expect(getByLabel('Nome:')).toBeVisible()` antes do `fill`, que falha em 5 s com mensagem clara. Timeout e configuração não foram alterados. |
+| Checklist do slide 17: sem `waitForTimeout`, sem `.locator('.btn-danger').nth()`, sem dados do seed, cada teste prepara os próprios dados, o que é criado pela tela é registrado (`registrarCategoriaPorNome`), sem `{ force: true }`, timeout ou retries. | Conferido. Nomes de categoria em minúsculas, porque a RN03 normaliza o nome. |
+| J04/J05, caso "cancelar": sem verificar o diálogo, o teste passaria mesmo se a exclusão nem pedisse confirmação. | O handler de `page.once('dialog')` marca que o diálogo apareceu, e o teste verifica isso com `expect.poll`. |
+
+## 4. Resultados (etapa 5 — avaliar)
+
+- `npm run test:e2e`: **14 aprovados**. Isso inclui 4 falhas esperadas (`test.fail()`): J05 cadastrar, J05 editar, J07 e J08.
+- **Estabilidade** (`npx playwright test --repeat-each=5`): 69 de 70 execuções aprovadas. Uma execução do J02 (teste de
+  referência) falhou na repetição 2. Ao repetir o J02 isoladamente 10 vezes (`--repeat-each=10`), passou em todas.
+  Os artefatos dessa falha não foram preservados, então a causa não foi confirmada. É um caso de **teste intermitente
+  a investigar**: a suspeita é concorrência com o banco compartilhado da aplicação.
+
+### Sabotagem controlada
+
+Observação: no Windows, o Docker não repassa ao Vite nem ao backend a notificação de alteração de arquivo. Após cada
+sabotagem foi preciso `docker compose restart <serviço>` (e de novo após o `git restore`).
+
+| # | Sabotagem | Arquivo | Jornada | Detectada? | Testes que falharam |
+|---|-----------|---------|---------|------------|---------------------|
+| 1 | Remover `fetchUsers()` após salvar | `Users.tsx` | J02, J03 | **Sim** | J02 › cria um usuário…; J03 › altera o nome… |
+| 2 | Trocar o texto do link "Categorias" por "Grupos" | `App.tsx` | J01 | **Sim** | J01 › leva do Dashboard à tela de Categorias |
+| 3 | Ignorar o `window.confirm` na exclusão | `Users.tsx` | J04 (caso 2) | **Sim** | J04 › caso 2: excluir e cancelar mantém o usuário |
+| 4 | Remover a checagem `canDeleteCategory` | `categoryController.ts` (backend) | J06 | **Sim** | J06 › exibe erro ao excluir categoria com tarefa… |
+
+Todas as 4 sabotagens foram detectadas (4/4). Cada uma foi desfeita com `git restore` antes da próxima.
+
+## 5. Defeitos encontrados
+
+| Jornada | Comportamento especificado | Comportamento observado | Teste que evidencia |
+|---------|----------------------------|-------------------------|---------------------|
+| J08 (RN01/RN04/API05) | COMPLETED → Pendente é recusado e a lista continua com COMPLETED | A alteração é **aceita**: após "Atualizar", a linha exibe `PENDING` | `Tasks.e2e.spec.ts` › J08 (`test.fail()`) |
+| J07 (RF09/API01) | Email repetido exibe "Email já cadastrado" | Exibe "Erro ao salvar usuário" (mesmo defeito do RF09, Aula 12) | `UsersEmail.e2e.spec.ts` › J07 (`test.fail()`) |
+| J05 (acessibilidade, análogo ao RF07) | Campos Nome e Descrição identificáveis pelo rótulo | Em Categorias (e em Tarefas), os `<label>` não têm `htmlFor` e os campos não têm `id`; `getByLabel` não os encontra | `Categories.e2e.spec.ts` › J05 cadastrar e editar (`test.fail()`) |
